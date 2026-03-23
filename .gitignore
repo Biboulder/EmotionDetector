@@ -1,0 +1,22 @@
+# Dataset
+emotion_dataset/
+
+# Kaggle downloaded data
+~/.cache/kagglehub/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Models (large files)
+*.tflite
+*.h5
+*.keras
+
+# OS
+.DS_Store
