@@ -1,5 +1,7 @@
 # Dataset
 emotion_dataset/
+emotion_dataset_mobilenet/
+generated_mobilenet/
 
 # Kaggle downloaded data
 ~/.cache/kagglehub/
