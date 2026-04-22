@@ -1,0 +1,7 @@
+tensorflow>=2.13
+numpy
+Pillow
+opencv-python
+scikit-learn
+kagglehub
+matplotlib

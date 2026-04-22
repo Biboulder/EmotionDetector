@@ -41,7 +41,8 @@ tf.random.set_seed(SEED)
 # ============================================================
 NOTEBOOK_DIR = os.path.dirname(os.path.abspath(__file__))
 
-data_path = "/Users/konstantinoszacharopoulos/.cache/kagglehub/datasets/minhtmnguyntrn/affectnet-dataset/versions/1"
+import kagglehub
+data_path = kagglehub.dataset_download('minhtmnguyntrn/affectnet-dataset')
 data_root = os.path.join(data_path, "data") if os.path.isdir(os.path.join(data_path, "data")) else data_path
 
 # Inspect top-level structure so we can confirm the folder layout
@@ -248,7 +249,7 @@ num_classes = len(class_names)
 print("\nClasses:", class_names)
 print("Number of classes:", num_classes)
 
-with open(CLASS_NAMES_PATH, "w") as f:
+with open(CLASS_NAMES_PATH, "w", encoding="utf-8") as f:
     json.dump(class_names, f)
 
 AUTOTUNE = tf.data.AUTOTUNE

@@ -1,0 +1,16 @@
+{
+    "python.defaultInterpreterPath": "c:/DTU/Hardware Software Codesign/DTU-02214/.venv/Scripts/python.exe",
+    "python.terminal.activateEnvironment": false,
+    "python.analysis.extraPaths": ["${workspaceFolder}"],
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/esp32/build/compile_commands.json",
+    "terminal.integrated.profiles.windows": {
+        "ESP-IDF (cmd)": {
+            "path": "C:\\Windows\\System32\\cmd.exe",
+            "args": ["/k", "${config:idf.espIdfPathWin}/export.bat"],
+            "env": {
+                "IDF_PYTHON_ENV_PATH": "${config:idf.toolsPathWin}/python_env/idf5.5_py3.11_env"
+            }
+        }
+    }
+}
