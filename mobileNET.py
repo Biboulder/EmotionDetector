@@ -58,9 +58,9 @@ IMAGES_PER_CLASS = 3000
 # Standard AffectNet mapping:
 # 0=neutral, 1=happy, 2=sad, 3=surprise, 4=fear, 5=disgust, 6=anger, 7=contempt
 label_map = {
-    '0': 'neutral',
-    '1': 'happy',
-    '2': 'sad',
+    '6': 'neutral',
+    '3': 'happy',
+    '4': 'sad',
 }
 SELECTED_CLASSES = set(label_map.keys())
 

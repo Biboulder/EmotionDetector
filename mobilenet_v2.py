@@ -18,11 +18,12 @@ NUM_CLASSES      = len(CLASSES)
 DATA_DIR         = 'emotion_dataset/'
 MODEL_DIR        = 'generated_mobilenet/'
 ALPHA            = 0.5   # MobileNetV2 width multiplier — smaller = faster on ESP32
-HEAD_EPOCHS      = 30
-FINETUNE_EPOCHS  = 50
+HEAD_EPOCHS      = 20
+FINETUNE_EPOCHS  = 20
 HEAD_LR          = 1e-3
-FINETUNE_LR      = 1e-5 
-FINE_TUNE_AT     = 60   # freeze layers below this index during fine-tuning
+FINETUNE_LR      = 3e-6
+FINE_TUNE_AT     = 120  # only unfreeze the last MobileNetV2 blocks
+LABEL_SMOOTHING  = 0.1
 
 os.makedirs(MODEL_DIR, exist_ok=True)
 
@@ -62,23 +63,36 @@ train_ds = train_ds.shuffle(1000).map(preprocess).prefetch(AUTOTUNE)
 val_ds   = val_ds.map(preprocess).prefetch(AUTOTUNE)
 test_ds  = test_ds.map(preprocess).prefetch(AUTOTUNE)
 
+data_augmentation = tf.keras.Sequential([
+    tf.keras.layers.RandomFlip('horizontal'),
+    tf.keras.layers.RandomRotation(0.05),
+    tf.keras.layers.RandomZoom(0.08),
+    tf.keras.layers.RandomTranslation(0.04, 0.04),
+    tf.keras.layers.RandomContrast(0.1),
+], name='augmentation')
+
 # ── Model ────────────────────────────────────────────────────
 def build_mobilenet(input_size, num_classes, alpha):
-    base_model = tf.keras.applications.MobileNetV3Small(
+    base_model = tf.keras.applications.MobileNetV2(
         input_shape=(input_size, input_size, 3),
         include_top=False,
         weights='imagenet',
+        alpha=alpha,
+        name='mobilenetv2_backbone',
     )
     base_model.trainable = False
     
     inputs = tf.keras.Input(shape=(input_size, input_size, 3))
-    x = tf.keras.applications.mobilenet_v3.preprocess_input(inputs)  # correct preprocessing
+    x = data_augmentation(inputs)
+    x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
     x = base_model(x, training=False)
     x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dense(128, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.3)(x)
-    x = tf.keras.layers.Dense(64, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.2)(x)
+    x = tf.keras.layers.Dense(
+        128,
+        activation='relu',
+        kernel_regularizer=tf.keras.regularizers.l2(1e-4),
+    )(x)
+    x = tf.keras.layers.Dropout(0.5)(x)
     outputs = tf.keras.layers.Dense(num_classes, activation='softmax')(x)
     
     return tf.keras.Model(inputs, outputs), base_model
@@ -90,14 +104,18 @@ model.summary()
 print("\n=== Phase 1: Training head ===")
 model.compile(
     optimizer=tf.keras.optimizers.AdamW(learning_rate=HEAD_LR, weight_decay=1e-4),
-    loss='sparse_categorical_crossentropy',
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(
+        label_smoothing=LABEL_SMOOTHING
+    ),
     metrics=['accuracy']
 )
 head_callbacks = [
-    tf.keras.callbacks.EarlyStopping(patience=5, restore_best_weights=True),
-    tf.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=3, min_lr=1e-6),
+    tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=4, restore_best_weights=True),
+    tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss', factor=0.5, patience=2, min_lr=1e-6
+    ),
     tf.keras.callbacks.ModelCheckpoint(
-        os.path.join(MODEL_DIR, 'head.keras'), save_best_only=True)
+        os.path.join(MODEL_DIR, 'head.keras'), monitor='val_loss', save_best_only=True)
 ]
 
 history_head = model.fit(
@@ -109,7 +127,7 @@ model = tf.keras.models.load_model(os.path.join(MODEL_DIR, 'head.keras'))
 
 # ── Phase 2: Fine-tune upper layers ──────────────────────────
 print("\n=== Phase 2: Fine-tuning ===")
-base_model = model.layers[1]
+base_model = model.get_layer('mobilenetv2_backbone')
 base_model.trainable = True
 for layer in base_model.layers[:FINE_TUNE_AT]:
     layer.trainable = False
@@ -120,21 +138,27 @@ for layer in base_model.layers:
 
 model.compile(
     optimizer=tf.keras.optimizers.AdamW(learning_rate=FINETUNE_LR, weight_decay=1e-4),
-    loss='sparse_categorical_crossentropy',
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(
+        label_smoothing=LABEL_SMOOTHING
+    ),
     metrics=['accuracy']
 )
 
 fine_callbacks = [
-    tf.keras.callbacks.EarlyStopping(patience=12, restore_best_weights=True),
-    tf.keras.callbacks.ReduceLROnPlateau(factor=0.6, patience=6, min_lr=1e-7),
+    tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
+    tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss', factor=0.5, patience=2, min_lr=1e-7
+    ),
     tf.keras.callbacks.ModelCheckpoint(
-        os.path.join(MODEL_DIR, 'finetuned.keras'), save_best_only=True)
+        os.path.join(MODEL_DIR, 'finetuned.keras'), monitor='val_loss', save_best_only=True)
 ]
 
 history_fine = model.fit(
     train_ds, validation_data=val_ds,
     epochs=FINETUNE_EPOCHS, callbacks=fine_callbacks
 )
+
+model = tf.keras.models.load_model(os.path.join(MODEL_DIR, 'finetuned.keras'))
 
 # ── Evaluation ───────────────────────────────────────────────
 print("\n=== Evaluation ===")
