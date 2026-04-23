@@ -8,7 +8,7 @@
 //
 // Pipeline:
 //   1. Center-crop FRAME_W×FRAME_H (320×240) to a FRAME_H×FRAME_H (240×240) square.
-//   2. Nearest-neighbour resize to TARGET_SIZE×TARGET_SIZE (160×160).
+//   2. Nearest-neighbour resize to TARGET_SIZE×TARGET_SIZE (96×96).
 //   3. Quantize each channel: int8 = clamp(round(pixel / INPUT_SCALE) + INPUT_ZERO_POINT)
 //      where pixel ∈ [0, 255] (the model includes preprocess_input internally).
 //

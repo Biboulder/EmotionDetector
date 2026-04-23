@@ -19,14 +19,14 @@ from PIL import Image
 from sklearn.metrics import classification_report, confusion_matrix
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH       = os.path.join(SCRIPT_DIR, "best_model.keras")
-DATASET_DIR      = os.path.join(SCRIPT_DIR, "emotion_dataset_mobilenet")
+MODEL_PATH       = os.path.join(SCRIPT_DIR, "best_model_uploaded.keras")
+DATASET_DIR      = os.path.join(SCRIPT_DIR, "emotion_dataset")
 GEN_DIR          = os.path.join(SCRIPT_DIR, "generated_mobilenet")
 CLASS_NAMES_PATH = os.path.join(GEN_DIR, "class_names.json")
 MODEL_H_PATH     = os.path.join(SCRIPT_DIR, "esp32", "main", "model.h")
 MODEL_C_PATH     = os.path.join(SCRIPT_DIR, "esp32", "main", "model.c")
 
-TARGET_SIZE      = 160
+TARGET_SIZE      = 96
 BATCH_SIZE       = 32
 REP_PER_CLASS    = 300   # images per class for representative dataset
 
@@ -55,9 +55,24 @@ test_ds = tf.keras.utils.image_dataset_from_directory(
 
 # ============================================================
 # Load Keras model
+# Keras 3 resolves BatchNormalization directly from keras.layers,
+# bypassing custom_objects. Monkey-patch __init__ to drop the
+# legacy renorm params saved by Keras 2 / TF2.x.
 # ============================================================
+_orig_bn_init = tf.keras.layers.BatchNormalization.__init__
+
+def _patched_bn_init(self, **kwargs):
+    kwargs.pop("renorm", None)
+    kwargs.pop("renorm_clipping", None)
+    kwargs.pop("renorm_momentum", None)
+    _orig_bn_init(self, **kwargs)
+
+tf.keras.layers.BatchNormalization.__init__ = _patched_bn_init
+
 print(f"\nLoading model: {MODEL_PATH}")
 model = tf.keras.models.load_model(MODEL_PATH)
+
+tf.keras.layers.BatchNormalization.__init__ = _orig_bn_init  # restore
 model.summary()
 
 # ============================================================
