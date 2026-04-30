@@ -1,0 +1,7 @@
+Command: /Users/konstantinoszacharopoulos/.espressif/python_env/idf5.5_py3.14_env/bin/python /Users/konstantinoszacharopoulos/esp/esp-idf/tools/idf_monitor.py -p /dev/cu.usbmodem11201 -b 115200 --toolchain-prefix xtensa-esp32s3-elf- --target esp32s3 --revision 0 /Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/camera.elf /Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader/bootloader.elf -m '/Users/konstantinoszacharopoulos/.espressif/python_env/idf5.5_py3.14_env/bin/python' '/Users/konstantinoszacharopoulos/esp/esp-idf/tools/idf.py'
+[0;33m--- esp-idf-monitor 1.9.0 on /dev/cu.usbmodem11201 115200[0m
+[0;33m--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H[0m
+[0m--- 0x4200abd3: [0;33ms_test_psram[0m[0m at [0;32m/Users/konstantinoszacharopoulos/esp/esp-idf/components/esp_psram/system_layer/esp_psram.c[0m[0m:[1;31m596[0m
+[0m--- 0x403c8700: [0;33m_stext[0m[0m at [0;32m??[0m[0m:[1;31m?[0m
+[0m--- 0x403c8924: [0;33mcall_start_cpu0[0m[0m at [0;32m/Users/konstantinoszacharopoulos/esp/esp-idf/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m25[0m
+[0m

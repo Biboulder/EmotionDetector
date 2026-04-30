@@ -1,0 +1,15 @@
+{
+  "terminal.integrated.profiles.osx": {
+    "ESP-IDF (zsh)": {
+      "path": "/bin/zsh",
+      "args": [
+        "-lc",
+        "source ${config:idf.espIdfPath}/export.sh && exec zsh -l"
+      ],
+      "env": {
+        "IDF_PYTHON_ENV_PATH": "${config:idf.toolsPath}/python_env/idf5.5_py3.11_env"
+      }
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "ESP-IDF (zsh)"
+}

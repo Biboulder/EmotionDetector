@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/CMakeFiles/bootloader
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/CMakeFiles/bootloader.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/CMakeFiles/bootloader-complete.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/Users/konstantinoszacharopoulos/Documents/DTU/Courses/Spring-2026/Hardware-Software-Codedesign/DTU-02214/camera/esp32/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
