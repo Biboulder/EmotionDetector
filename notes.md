@@ -51,3 +51,15 @@ Float32 accuracy (baseline)
 INT8 accuracy (quantized version)
 Quantization parameters (INPUT_SCALE, OUTPUT_SCALE, etc.)
 If INT8 accuracy is significantly worse than F32, that's your problem: the representative dataset (300 images) isn't representative enough. Solution: increase REP_PER_CLASS from 300 → 500 or 1000 and re-run the script.
+
+
+The load_representative_images function does not classify images at all — it has no knowledge of which emotion a file belongs to. Here's what it actually does:
+
+Purpose: It provides a calibration dataset for INT8 quantization, not for training or evaluation. The quantizer uses these images purely to observe the range of activation values flowing through the network, so it can pick good scale/zero-point parameters. The actual class labels are irrelevant for this purpose.
+
+How it works (convert_and_export.py:75-91):
+
+It iterates over subdirectories of emotion_dataset/train/ — whatever folders exist there (e.g. happy/, sad/, neutral/)
+It picks up to REP_PER_CLASS=300 non-augmented image files from each folder
+It loads each image as raw [0, 255] float32 pixels
+Returns a flat array of all images — no labels are attached
