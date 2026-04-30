@@ -42,9 +42,9 @@ static camera_config_t make_camera_config()
     cfg.fb_count     = 2;   // multiple buffers needed for CAMERA_GRAB_LATEST
     cfg.grab_mode    = CAMERA_GRAB_LATEST;
 
-    // RGB565: easy to convert to RGB888; QVGA (320x240) fits in PSRAM
+    // RGB565 96x96: matches model input directly — no crop/resize needed.
     cfg.pixel_format = PIXFORMAT_RGB565;
-    cfg.frame_size   = FRAMESIZE_QVGA;
+    cfg.frame_size   = FRAMESIZE_96X96;
     cfg.jpeg_quality = 12;  // unused for RGB565, set to sane default
 
     return cfg;

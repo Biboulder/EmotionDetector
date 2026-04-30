@@ -3,7 +3,7 @@
 Facial emotion recognition on XIAO ESP32-S3 Sense. A MobileNetV2 α=0.5 model is trained on AffectNet, quantized to INT8, and deployed as a TFLite Micro application that runs inference from the camera in real time.
 
 **Classes:** happy, neutral, sad  
-**Input:** 160×160 RGB — ESP32 crops 240×240 center square from 320×240 QVGA frame  
+**Input:** 96×96 RGB — camera captures at model resolution directly, no crop or resize  
 **Model size:** ~1.3 MB TFLite INT8
 
 ---
@@ -71,10 +71,16 @@ Two-phase training: frozen MobileNetV2 base → fine-tune upper layers. Key outp
 ### Step 4 — Convert to TFLite and export C files
 
 ```bash
-python convert_and_export.py
+python convert_and_export.py <model.keras>
 ```
 
-Reads `best_model.keras`, converts to Float32 then INT8 (post-training quantization), and writes:
+Pass the `.keras` file to convert (relative paths are resolved from the project root). Example:
+
+```bash
+python convert_and_export.py best_model_uploaded.keras
+```
+
+Converts to Float32 then INT8 (post-training quantization). INT8 calibration uses real images captured by the ESP camera (`happy/`, `sad/`, `suprised/`), which better matches the sensor's actual colour distribution. Writes:
 
 - `generated_mobilenet/emotion_mobilenet_f32.tflite`
 - `generated_mobilenet/emotion_mobilenet_int8.tflite`
@@ -150,6 +156,6 @@ To train on different emotions, change `label_map` in `mobileNET.py` (keys are A
 
 **Camera init failed on ESP32** — confirm target is `esp32s3` and that the board is the XIAO ESP32-S3 Sense (pin assignments in `camera.cpp` are specific to that board).
 
-**`best_model.keras` not found** — run `mobileNET.py` first; the file is gitignored.
+**`<model>.keras` not found** — run `mobileNET.py` first to generate it; `.keras` files are gitignored.
 
 **`idf.py` not found** — use the **ESP-IDF (cmd)** terminal profile, not the default PowerShell terminal.

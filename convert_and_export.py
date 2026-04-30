@@ -8,10 +8,11 @@ Outputs:
   esp32/main/model.c                                 - C source with model binary
 
 Usage:
-  python convert_and_export.py
+  python convert_and_export.py <model.keras>
 """
 
 import os
+import sys
 import json
 import numpy as np
 import tensorflow as tf
@@ -19,16 +20,30 @@ from PIL import Image
 from sklearn.metrics import classification_report, confusion_matrix
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH       = os.path.join(SCRIPT_DIR, "best_model_uploaded.keras")
+
+if len(sys.argv) < 2:
+    print("Usage: python convert_and_export.py <model.keras>")
+    sys.exit(1)
+
+model_arg = sys.argv[1]
+MODEL_PATH = model_arg if os.path.isabs(model_arg) else os.path.join(SCRIPT_DIR, model_arg)
 DATASET_DIR      = os.path.join(SCRIPT_DIR, "emotion_dataset")
 GEN_DIR          = os.path.join(SCRIPT_DIR, "generated_mobilenet")
 CLASS_NAMES_PATH = os.path.join(GEN_DIR, "class_names.json")
 MODEL_H_PATH     = os.path.join(SCRIPT_DIR, "esp32", "main", "model.h")
 MODEL_C_PATH     = os.path.join(SCRIPT_DIR, "esp32", "main", "model.c")
 
+# Real-world ESP camera images used for INT8 calibration (representative dataset).
+# These folders contain images captured directly from the XIAO ESP32-S3 camera.
+REALWORLD_DIRS   = [
+    os.path.join(SCRIPT_DIR, "happy"),
+    os.path.join(SCRIPT_DIR, "sad"),
+    os.path.join(SCRIPT_DIR, "suprised"),
+]
+
 TARGET_SIZE      = 96
 BATCH_SIZE       = 32
-REP_PER_CLASS    = 300   # images per class for representative dataset
+REP_PER_CLASS    = 50   # images per folder for representative dataset
 
 os.makedirs(GEN_DIR, exist_ok=True)
 
@@ -87,26 +102,27 @@ print(f"Test accuracy: {test_acc:.4f}")
 # Images are loaded raw [0, 255]; preprocess_input is inside
 # the model, so representative data should also be raw.
 # ============================================================
-def load_representative_images(train_dir, n_per_class=REP_PER_CLASS):
+def load_representative_images(dirs, n_per_dir=REP_PER_CLASS):
+    """Load up to n_per_dir images from each directory as raw [0,255] float32."""
     images = []
-    for cls in sorted(os.listdir(train_dir)):
-        cls_dir = os.path.join(train_dir, cls)
-        if not os.path.isdir(cls_dir):
+    for folder in dirs:
+        if not os.path.isdir(folder):
+            print(f"  WARNING: calibration folder not found, skipping: {folder}")
             continue
-        # Prefer original (non-augmented) files
-        files = [f for f in os.listdir(cls_dir) if not f.startswith("aug_")]
-        files = files[:n_per_class]
+        files = sorted(f for f in os.listdir(folder)
+                       if f.lower().endswith((".png", ".jpg", ".jpeg")))[:n_per_dir]
         for fname in files:
             try:
-                img = Image.open(os.path.join(cls_dir, fname)).convert("RGB")
+                img = Image.open(os.path.join(folder, fname)).convert("RGB")
                 img = img.resize((TARGET_SIZE, TARGET_SIZE), Image.BILINEAR)
                 images.append(np.array(img, dtype=np.float32))  # [0, 255]
             except Exception:
                 pass
+        print(f"  Loaded {len(files)} images from {os.path.basename(folder)}/")
     return np.array(images, dtype=np.float32)
 
-print("\nBuilding representative dataset...")
-rep_data = load_representative_images(os.path.join(DATASET_DIR, "train"))
+print("\nBuilding representative dataset from real ESP camera images...")
+rep_data = load_representative_images(REALWORLD_DIRS)
 print(f"Representative dataset shape: {rep_data.shape}")
 
 # ============================================================

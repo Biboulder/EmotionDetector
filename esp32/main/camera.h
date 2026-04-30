@@ -3,9 +3,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Camera output resolution (QVGA, RGB565)
-#define FRAME_W 320
-#define FRAME_H 240
+// Camera output resolution: square 96x96 RGB565 — matches model input directly.
+// Capturing at the model's native size skips center-crop and resize entirely.
+#define FRAME_W 96
+#define FRAME_H 96
 
 #ifdef __cplusplus
 extern "C" {

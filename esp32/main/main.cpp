@@ -22,10 +22,10 @@ static const char *const CLASS_NAMES[NUM_CLASSES] = CLASS_NAMES_INIT;
 // Minimum softmax probability to report a confident prediction
 #define CONFIDENCE_THRESHOLD 0.60f
 
-// Camera frame buffer: 320×240×2 bytes = 150 KB  → place in PSRAM
+// Camera frame buffer: 96×96×2 bytes ≈ 18 KB  → place in PSRAM
 EXT_RAM_BSS_ATTR static uint8_t  s_rgb565_buf[FRAME_W * FRAME_H * 2];
 
-// Quantised input tensor: 160×160×3 bytes = 75 KB  → place in PSRAM
+// Quantised input tensor: 96×96×3 bytes ≈ 27 KB  → place in PSRAM
 EXT_RAM_BSS_ATTR static int8_t   s_input_buf[TARGET_SIZE * TARGET_SIZE * 3];
 
 static float s_probs[NUM_CLASSES];
@@ -70,7 +70,7 @@ void loop(void)
         return;
     }
 
-    // 2. Preprocess: center crop 240×240 → resize 160×160 → quantise to INT8
+    // 2. Preprocess: unpack RGB565 → RGB888 and quantise to INT8 (no crop/resize — camera already at 96×96)
     int64_t t0 = esp_timer_get_time();
     preprocess_frame(s_rgb565_buf, s_input_buf);
     int64_t us_preprocess = esp_timer_get_time() - t0;
