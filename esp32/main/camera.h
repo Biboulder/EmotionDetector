@@ -2,11 +2,14 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "model.h"
 
-// Camera output resolution: square 96x96 RGB565 — matches model input directly.
-// Capturing at the model's native size skips center-crop and resize entirely.
-#define FRAME_W 96
-#define FRAME_H 96
+// Output resolution after center-crop, derived automatically from the
+// generated model.h so that changing the model size only requires re-running
+// convert_and_export.py (and retraining). Sensor captures at 240×240;
+// camera.cpp center-crops to FRAME_W×FRAME_H.
+#define FRAME_W TARGET_SIZE
+#define FRAME_H TARGET_SIZE
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,14 +1,18 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdint>
+#include <cstring>
+
+// ESP includes
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "esp_attr.h"   // EXT_RAM_BSS_ATTR
+#include "esp_attr.h"
 #include "esp_heap_caps.h"
-#include "esp_task_wdt.h" // For disabling Task Watchdog
+#include "driver/usb_serial_jtag.h"
 
+// Project includes
 #include "camera.h"
 #include "preprocess.h"
 #include "inference.h"
@@ -16,17 +20,17 @@
 
 static const char *TAG = "EmotionDetect";
 
-// Class names — must match order in class_names.json (alphabetical from Keras)
 static const char *const CLASS_NAMES[NUM_CLASSES] = CLASS_NAMES_INIT;
 
-// Minimum softmax probability to report a confident prediction
-#define CONFIDENCE_THRESHOLD 0.60f
+// Protocol: viewer sends 'S' to start streaming. Each iteration the ESP sends
+//   "\n===FRAME:<W>:<H>===\n"   (ASCII preamble)
+//   <W * H * 2 bytes>           (raw big-endian RGB565)
+//   "PRED:c0:p0,c1:p1,...\n"    (ASCII predictions, one line)
+static constexpr size_t USB_CHUNK_SIZE = 256;
+static constexpr TickType_t USB_TIMEOUT = pdMS_TO_TICKS(1000);
 
-// Camera frame buffer: 96×96×2 bytes ≈ 18 KB  → place in PSRAM
-EXT_RAM_BSS_ATTR static uint8_t  s_rgb565_buf[FRAME_W * FRAME_H * 2];
-
-// Quantised input tensor: 96×96×3 bytes ≈ 27 KB  → place in PSRAM
-EXT_RAM_BSS_ATTR static int8_t   s_input_buf[TARGET_SIZE * TARGET_SIZE * 3];
+EXT_RAM_BSS_ATTR static uint8_t s_rgb565_buf[FRAME_W * FRAME_H * 2];
+EXT_RAM_BSS_ATTR static int8_t  s_input_buf[TARGET_SIZE * TARGET_SIZE * 3];
 
 static float s_probs[NUM_CLASSES];
 
@@ -40,65 +44,88 @@ static void init_nvs(void)
     ESP_ERROR_CHECK(err);
 }
 
+static void usb_write_all(const uint8_t *buf, size_t len)
+{
+    size_t offset = 0;
+    while (offset < len) {
+        size_t to_write = (offset + USB_CHUNK_SIZE < len) ? USB_CHUNK_SIZE : (len - offset);
+        int written = usb_serial_jtag_write_bytes(buf + offset, to_write, USB_TIMEOUT);
+        if (written <= 0) {
+            vTaskDelay(1);
+            continue;
+        }
+        offset += written;
+    }
+}
+
 void setup(void)
 {
     init_nvs();
 
-    // Disable task watchdog to allow long inference times
-    esp_task_wdt_deinit();
-
     if (!camera_init()) {
-        ESP_LOGE(TAG, "Camera init failed — halting");
+        ESP_LOGE(TAG, "Camera init failed - halting");
         abort();
     }
-
     if (!inference_init()) {
-        ESP_LOGE(TAG, "Inference init failed — halting");
+        ESP_LOGE(TAG, "Inference init failed - halting");
         abort();
     }
 
-    ESP_LOGI(TAG, "Emotion detector ready. Confidence threshold: %.0f%%",
-             CONFIDENCE_THRESHOLD * 100.0f);
+    // Install USB-Serial-JTAG driver for direct binary I/O.
+    usb_serial_jtag_driver_config_t cfg = {
+        .tx_buffer_size = 1024,
+        .rx_buffer_size = 256,
+    };
+    ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&cfg));
+
+    ESP_LOGI(TAG, "Ready. Send 'S' to start streaming (%dx%d, %d classes).",
+             FRAME_W, FRAME_H, NUM_CLASSES);
+
+    // Wait for 'S' from the viewer.
+    char c;
+    do {
+        int r = usb_serial_jtag_read_bytes(&c, 1, portMAX_DELAY);
+        if (r < 0) abort();
+    } while (c != 'S');
+
+    // Suppress ESP_LOG output once streaming starts; log lines mixed into the
+    // binary frame data would corrupt it on the viewer side.
+    esp_log_level_set("*", ESP_LOG_NONE);
 }
 
 void loop(void)
 {
-    // 1. Capture raw RGB565 frame
     if (!camera_capture_frame(s_rgb565_buf)) {
-        ESP_LOGW(TAG, "Frame capture failed");
         vTaskDelay(pdMS_TO_TICKS(100));
         return;
     }
 
-    // 2. Preprocess: unpack RGB565 → RGB888 and quantise to INT8 (no crop/resize — camera already at 96×96)
-    int64_t t0 = esp_timer_get_time();
     preprocess_frame(s_rgb565_buf, s_input_buf);
-    int64_t us_preprocess = esp_timer_get_time() - t0;
-
-    // 3. Run TFLite Micro inference
-    int64_t t1 = esp_timer_get_time();
     if (!inference_run(s_input_buf, s_probs)) {
-        ESP_LOGE(TAG, "Inference failed");
+        vTaskDelay(pdMS_TO_TICKS(100));
         return;
     }
-    int64_t us_inference = esp_timer_get_time() - t1;
 
-    // 4. Find argmax
-    int best = 0;
-    for (int i = 1; i < NUM_CLASSES; i++) {
-        if (s_probs[i] > s_probs[best]) best = i;
+    // 1. Preamble (leading \n separates it from any prior content).
+    char preamble[64];
+    int n = snprintf(preamble, sizeof(preamble),
+                     "\n===FRAME:%d:%d===\n", FRAME_W, FRAME_H);
+    usb_write_all(reinterpret_cast<const uint8_t *>(preamble), (size_t)n);
+
+    // 2. Raw RGB565 frame.
+    usb_write_all(s_rgb565_buf, sizeof(s_rgb565_buf));
+
+    // 3. Prediction line.
+    char pred[256];
+    int p = snprintf(pred, sizeof(pred), "PRED:");
+    for (int i = 0; i < NUM_CLASSES && p < (int)sizeof(pred) - 32; i++) {
+        p += snprintf(pred + p, sizeof(pred) - p, "%s%s:%.4f",
+                      (i == 0) ? "" : ",", CLASS_NAMES[i], s_probs[i]);
     }
+    p += snprintf(pred + p, sizeof(pred) - p, "\n");
+    usb_write_all(reinterpret_cast<const uint8_t *>(pred), (size_t)p);
 
-    // 5. Output results to the monitor
-    ESP_LOGI(TAG, "Prediction: %s (%.1f%%) | Preprocess: %lld ms, Inference: %lld ms",
-             CLASS_NAMES[best], s_probs[best] * 100.0f,
-             us_preprocess / 1000, us_inference / 1000);
-
-    for (int i = 0; i < NUM_CLASSES; i++) {
-        ESP_LOGI(TAG, "  - %s: %.1f%%", CLASS_NAMES[i], s_probs[i] * 100.0f);
-    }
-
-    // Delay between inferences (e.g., 0.5 seconds), making it analyze less frequently
+    // ~2 fps; the viewer can't keep up much faster over USB-CDC anyway.
     vTaskDelay(pdMS_TO_TICKS(500));
 }
 

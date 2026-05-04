@@ -5,6 +5,17 @@
 
 static const char *TAG = "Camera";
 
+// Sensor captures at this native square resolution; camera_capture_frame()
+// center-crops the result down to FRAME_W × FRAME_H.
+// 240×240 covers all typical model sizes (96, 128, 160) without a resize step.
+static constexpr size_t SENSOR_FRAME_W = 240;
+static constexpr size_t SENSOR_FRAME_H = 240;
+static constexpr size_t CROP_X_OFFSET  = (SENSOR_FRAME_W - FRAME_W) / 2;
+static constexpr size_t CROP_Y_OFFSET  = (SENSOR_FRAME_H - FRAME_H) / 2;
+
+static_assert(FRAME_W <= SENSOR_FRAME_W && FRAME_H <= SENSOR_FRAME_H,
+              "FRAME_W/H must not exceed SENSOR_FRAME_W/H (240).");
+
 static camera_config_t make_camera_config()
 {
     camera_config_t cfg = {};
@@ -42,9 +53,8 @@ static camera_config_t make_camera_config()
     cfg.fb_count     = 2;   // multiple buffers needed for CAMERA_GRAB_LATEST
     cfg.grab_mode    = CAMERA_GRAB_LATEST;
 
-    // RGB565 96x96: matches model input directly — no crop/resize needed.
     cfg.pixel_format = PIXFORMAT_RGB565;
-    cfg.frame_size   = FRAMESIZE_96X96;
+    cfg.frame_size   = FRAMESIZE_240X240;  // capture square, center-crop to FRAME_W×FRAME_H
     cfg.jpeg_quality = 12;  // unused for RGB565, set to sane default
 
     return cfg;
@@ -59,7 +69,8 @@ bool camera_init(void)
         ESP_LOGE(TAG, "Camera init failed: 0x%x", err);
         return false;
     }
-    ESP_LOGI(TAG, "Camera ready: %dx%d RGB565", FRAME_W, FRAME_H);
+    ESP_LOGI(TAG, "Camera ready: sensor %dx%d → crop %dx%d RGB565",
+             (int)SENSOR_FRAME_W, (int)SENSOR_FRAME_H, FRAME_W, FRAME_H);
     return true;
 }
 
@@ -71,19 +82,19 @@ bool camera_capture_frame(uint8_t *rgb565_buffer)
         return false;
     }
 
-    if (fb->width != FRAME_W || fb->height != FRAME_H || fb->format != PIXFORMAT_RGB565) {
+    if (fb->width != SENSOR_FRAME_W || fb->height != SENSOR_FRAME_H || fb->format != PIXFORMAT_RGB565) {
         ESP_LOGE(TAG, "Unexpected frame: %dx%d fmt=%d", fb->width, fb->height, fb->format);
         esp_camera_fb_return(fb);
         return false;
     }
 
-    if (fb->len != FRAME_W * FRAME_H * 2) {
-        ESP_LOGW(TAG, "Corrupt frame size: %zu instead of %d", fb->len, FRAME_W * FRAME_H * 2);
-        esp_camera_fb_return(fb);
-        return false;
+    // Center-crop SENSOR_FRAME_W×SENSOR_FRAME_H down to FRAME_W×FRAME_H (2 bytes per pixel).
+    for (size_t row = 0; row < FRAME_H; ++row) {
+        const size_t src = ((row + CROP_Y_OFFSET) * SENSOR_FRAME_W + CROP_X_OFFSET) * 2;
+        const size_t dst = row * FRAME_W * 2;
+        memcpy(rgb565_buffer + dst, fb->buf + src, FRAME_W * 2);
     }
 
-    memcpy(rgb565_buffer, fb->buf, FRAME_W * FRAME_H * 2);
     esp_camera_fb_return(fb);
     return true;
 }

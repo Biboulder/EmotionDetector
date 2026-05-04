@@ -35,3 +35,8 @@ esp32/main/model.c
 esp32/main/model.h
 live_serial_viewer.py
 CLAUDE.md
+
+happy/
+surprised/
+sad/
+

@@ -39,12 +39,14 @@ bool inference_init(void)
     }
 
     // Register ops used by MobileNetV2 INT8
-    static tflite::MicroMutableOpResolver<13> resolver;
+    static tflite::MicroMutableOpResolver<15> resolver;
     resolver.AddQuantize();
     resolver.AddDequantize();
     resolver.AddConv2D();
     resolver.AddDepthwiseConv2D();
     resolver.AddAdd();
+    resolver.AddMul();            // preprocess_input: x/127.5 - 1.0
+    resolver.AddSub();            // preprocess_input: x/127.5 - 1.0
     resolver.AddMean();           // GlobalAveragePooling2D → ReduceMean
     resolver.AddReshape();
     resolver.AddFullyConnected(); // Dense layers
